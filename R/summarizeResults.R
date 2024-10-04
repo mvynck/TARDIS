@@ -2,10 +2,11 @@
 #'
 #' @param results A `data.frame` object containing all the metrics for
 #'     every compound in every sample
-#'
+#' @param output_directory description
+#' @param int_std_id description
 #' @examples
 #' @author Pablo Vangeenderhuysen
-.summarizeResults <- function(results, output_directory) {
+.summarizeResults <- function(results, output_directory,int_std_id) {
   auc_table <- results %>%
     select(Component, Sample, AUC) %>%
     spread(Sample, AUC, fill = NA, drop = FALSE)
@@ -42,14 +43,35 @@
       sd(., na.rm = TRUE)
       else
         dplyr::first(.)))
+  NAs <- QC_results %>%
+    group_by(Component) %>%
+    summarise_at(vars(AUC),funs(sum(is.na(.))))
+  mean_metrics_table$NFs <- NAs$AUC
   mean_metrics_table$CV <-
     sd_metrics_table$AUC / mean_metrics_table$AUC
   mean_metrics_table$mean <- NULL
   mean_metrics_table$ID <- NULL
   mean_metrics_table$na.rm <- NULL
-  for(i in 1:nrow(mean_metrics_table))
-    if(!is.na(mean_metrics_table$CV[i]) && mean_metrics_table$CV[i] > 0.4)
-      mean_metrics_table$warning[i] = "CV is > 0.3"
+  mean_metrics_table$foundRT <- NULL
+  int_std_metrics <-
+    mean_metrics_table[which(mean_metrics_table$Component %in% int_std_id),]
+  mean_metrics_table$warning <- NA
+  for(i in 1:nrow(mean_metrics_table)){
+    if(mean_metrics_table$peak_cor[i] >= 0.9 * mean(int_std_metrics$peak_cor)){
+      mean_metrics_table$warning[i] <- "Good"
+    }
+        else if(mean_metrics_table$peak_cor[i] >= 0.8 * mean(int_std_metrics$peak_cor)){
+          mean_metrics_table$warning[i] <- "Ambiguous"
+        }
+        else{
+          mean_metrics_table$warning[i] <- "Bad"
+        }
+  }
+  mean_metrics_table$trold <- mean_metrics_table$trold / 60
+  mean_metrics_table$tr <- round(mean_metrics_table$tr / 60, digits = 2)
+  mean_metrics_table$CV <- round(mean_metrics_table$CV,2)
+  mean_metrics_table$peak_cor <- round(mean_metrics_table$peak_cor,2)
+  mean_metrics_table$SNR <- round(mean_metrics_table$SNR,2)
   write_xlsx(avg_metrics_table,
              paste0(output_directory,
                     "feat_table.xlsx"))

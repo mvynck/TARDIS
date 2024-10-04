@@ -332,10 +332,10 @@ tardis_peaks <-
         files_batch <-
           files[batch_positions[[batchnr]][1]:batch_positions[[batchnr]][2]]
         data_batch <- readMsExperiment(
-          spectraFiles = files_batch,
-          backend = MsBackendMzR(),
-          BPPARAM = SnowParam(workers = 1)
-        )
+          spectraFiles = files_batch)
+          #backend = MsBackendMzR(),
+          #BPPARAM = SnowParam(workers = 1))
+
         checkScans(data_batch@spectra)
         #Define study and QC samples --> all not QC files are deemed study files
         sampleData(data_batch)$sample_type <- "study"
@@ -628,52 +628,9 @@ tardis_peaks <-
         }
       }
       results <- results_samples
-
       if(is.null(max_int_filter) == FALSE && max_int_filter != 0){
         results <- results[which(results$MaxInt >= max_int_filter),]
       }
-
-      #AUC, int, SNR & peakcor tables for each component peak in every sample
-      auc_table <- results %>%
-        select(Component, Sample, AUC) %>%
-        spread(Sample, AUC, fill = NA, drop = FALSE)
-
-      write.csv(auc_table, file = paste0(output_directory, "auc_table.csv"))
-      pop_table <- results %>%
-        select(Component, Sample, pop) %>%
-        spread(Sample, pop, fill = NA, drop = FALSE)
-
-      write.csv(pop_table, file = paste0(output_directory, "pop_table.csv"))
-      SNR_table <- results %>%
-        select(Component, Sample, SNR) %>%
-        spread(Sample, SNR, fill = NA, drop = FALSE)
-
-      write.csv(SNR_table, file = paste0(output_directory, "snr_table.csv"))
-      int_table <- results %>%
-        select(Component, Sample, MaxInt) %>%
-        spread(Sample, MaxInt, fill = NA, drop = FALSE)
-
-      write.csv(int_table, file = paste0(output_directory, "int_table.csv"))
-      peakcor_table <- results %>%
-        select(Component, Sample, peak_cor) %>%
-        spread(Sample, peak_cor, fill = NA, drop = FALSE)
-
-      write.csv(peakcor_table, file = paste0(output_directory, "peakcor_table.csv"))
-
-
-      #summarize feature table based on QC's
-      avg_metrics_table <- NULL
-      if (length(data_QC) != 0) {
-        QC_results <-  results[grep("QC", results$Sample), ]
-        avg_metrics_table <- QC_results %>%
-          group_by(Component) %>%
-          summarise_at(vars(-Sample), list(~ if (is.numeric(.))
-            mean(., na.rm = TRUE)
-            else
-              first(.)))
-        write_xlsx(avg_metrics_table,paste0(output_directory,
-                                            "feat_table.xlsx"))
-      }
-      return(list(auc_table, avg_metrics_table))
+      .summarizeResults(results)
     }
   }
